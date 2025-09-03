@@ -6,47 +6,40 @@ void setup() {
   Serial.begin(9600);
   zInitialize();
 }
-//zRobotGetLineSensor returns 0 for black and 3 for white
-// 1 == moter_Left sensor black
-// 2 == moter_Right sensor black
-// 3 == both sensor white
-// 0 == both sensor black
-
 
 void loop() {
-  int ultrasensor = zRobotGetUltraSensor();
-  int linesensor = zRobotGetLineSensor();
-          Serial.print("Distance = ");
-          Serial.println(zRobotGetUltraSensor());
-          Serial.print("line ");
-          Serial.println(zRobotGetLineSensor());
-  if (linesensor == 0) {
-    moter_Right = gas;
-    moter_Left = gas;
-  } else if (linesensor == 2) {
-    moter_Right = nogas;
-    moter_Left = gas;
-    rightside = false;
-  } else if (linesensor == 1) {
-    moter_Right = gas;
-    moter_Left = gas;
-    rightside = true;
-  } else if (linesensor == 3) {  // white
-    if (rightside) {
-      moter_Right = gas;
-      moter_Left = nogas;
+  RobotData robotData;
+  robotData.ultrasensor = zRobotGetUltraSensor();
+  robotData.linesensor = zRobotGetLineSensor();
+
+  if (robotData.linesensor == 0) {
+    robotData.moter_Right = gas;
+    robotData.moter_Left = gas;
+  } else if (robotData.linesensor == 2) {
+    robotData.moter_Right = nogas;
+    robotData.moter_Left = gas;
+    robotData.medsols = false;
+  } else if (robotData.linesensor == 1) {
+    robotData.moter_Right = gas;
+    robotData.moter_Left = gas;
+    robotData.medsols = true;
+  } else if (robotData.linesensor == 3) {  // white
+    if (robotData.medsols) {
+      robotData.moter_Right = gas;
+      robotData.moter_Left = nogas;
     } else {
-      moter_Right = nogas;
-      moter_Left = gas;
+      robotData.moter_Right = nogas;
+      robotData.moter_Left = gas;
     }
   }
-  if (ultrasensor < 20) {
+  if (robotData.ultrasensor < 20) {
     /*
     * Avoid obstacle
     */
-    Obstacle(rightside);
+    Obstacle(robotData.medsols);
   }
-  Drive(moter_Right, moter_Left);
+  Drive(robotData.moter_Right, robotData.moter_Left);
+  DebugPrint(robotData);
 }
 void Obstacle(bool RI) {
   /*if (!RI) {
@@ -65,10 +58,20 @@ void Obstacle(bool RI) {
 }
 
 void Drive(int R, int L) {
-  Serial.print("drivinh r ");
-  Serial.println(R);
-  Serial.print("drivinh L ");
-  Serial.println(L);
   zRobotSetMotorSpeed(1, -R);
   zRobotSetMotorSpeed(2, L);
+}
+void DebugPrint(const RobotData& data){
+  int intvalues[NUM_FIELDS] = {
+    data.moter_Right,
+    data.moter_Left,
+    static_cast<int>(data.medsols),
+    data.ultrasensor,
+    data.linesensor
+  };
+  for(int i= 0; i< NUM_FIELDS; i++){
+    Serial.print(DebugLabels[i]);
+    Serial.flush();
+    Serial.println(intvalues[i]);
+  }
 }
