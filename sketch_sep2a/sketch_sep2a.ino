@@ -2,44 +2,88 @@
 #include "Values.h"
 
 RobotData robotData;
+void run(int Right, int Left){
+  zRobotSetMotorSpeed(1, -Right);
+  zRobotSetMotorSpeed(2, Left);
+}
 
 void Obsticales(){
-/*
-  If obstacle is in the way of the robot
-  Suspend all other tasks       vTaskSuspend()
-  Go around obstacle
-  Resume other tasks            vTaskResume()
-*/
- Serial.println("Obsticle körswadawdwadawdawdwadwadaw");
-  if(ObstacleInWay){
-    n++;
-
-     if(robotData.medsols == true){
-       zRobotSetMotorSpeed(1, -40);
-      zRobotSetMotorSpeed(2, -80);
-    }
-    else{
-       zRobotSetMotorSpeed(1, -80);
-      zRobotSetMotorSpeed(2, -40);
-    }
-    if(n > 10){
-      ObstacleInWay = false;
-
-      for(int i = 0; i< NR_OF_TASKS; i++)
-    {
-        vTaskResume(*zTaskList[i].handle);
-    }
-    vTaskSuspend(*zTaskList[2].handle);
-    }
+ if(ObstacleInWay){
+  n++;
+  if(n < 4){
+   !robotData.medsols ? run(0, 200) : run(200, 0);
   }
-}
+  else if(n >= 4 && n < 8){
+    !robotData.medsols ? run(100, 100) : run(100, 100);
+  }
+  else if(n >= 8 && n < 14){
+    !robotData.medsols ? run(180, 0) : run(0, 180);
+  }
+  else if(zRobotGetLineSensor() != 3){
+    ObstacleInWay = false;
+  }
+  else if(n > 70){
+    run(0,0);
+  }
+  else{
+    run(100, 100);
+  }
+  }
+ 
+ }
 
 void SensorData(){
   /*
   *   Read sensor data and update which way robot should drive
   */
+  if(!ObstacleInWay){
+    ReadLineSensor();
+  }
+}
 
+void SonicData(){
+  if(!ObstacleInWay){
+    ReadSonicSensor();
+  }
+}
+void Drive(){
+ if(!ObstacleInWay){
+  zRobotSetMotorSpeed(1, -robotData.moter_Right);
+  zRobotSetMotorSpeed(2, robotData.moter_Left);
+  Serial.println("Driving");
+  Serial.println(robotData.moter_Right);
+}}
+void setup() {
+  // put your setup code here, to run once:
+  Serial.begin(9600);
+  LineSensor line;
+  SonicSensor sonic;
+  Driver drive;
+  Obsticale obsticale;
+  zInitialize();
+  zScheduleTask(SensorData, line.Period, line.ExecTime);
+  zScheduleTask(SonicData, sonic.Period, sonic.ExecTime);
+  zScheduleTask(Obsticales, obsticale.Period, obsticale.ExecTime);
+  zScheduleTask(Drive, drive.Period, drive.ExecTime);
+  
 
+  zStart();
+}
+
+void loop() {
+  
+}
+void ReadSonicSensor(){
+  robotData.ultrasensor = zRobotGetUltraSensor();
+  if (robotData.ultrasensor < DistanceToInterupt && robotData.ultrasensor > DistanceToInterupt - 20){
+    ObstacleInWay = true;
+    n = 0;    
+  }
+  else if(robotData.ultrasensor < DistanceToInterupt - 20){
+    run(-100, -100);
+  }
+}
+void ReadLineSensor(){
   robotData.linesensor = zRobotGetLineSensor();
 
   if (robotData.linesensor == 0) {
@@ -62,80 +106,7 @@ void SensorData(){
       robotData.moter_Left = gas;
     }
   }
- // DebugPrint(robotData);
 }
-
-void SonicData(){
-
-  robotData.ultrasensor = zRobotGetUltraSensor();
-  if (robotData.ultrasensor < 30 && robotData.ultrasensor > 10) {
-    /*
-    * Avoid obstacle
-    */
-    Serial.println("TaskResume");
-    vTaskResume(*zTaskList[2].handle);    //Resume task
-    vTaskSuspend(*zTaskList[0].handle);
-    vTaskSuspend(*zTaskList[3].handle);
-    ObstacleInWay = true;
-    n = 0;
-    vTaskSuspend(*zTaskList[1].handle);
-    
-  }
-  else if(robotData.ultrasensor < 10){
-    zRobotSetMotorSpeed(1, 0);
-    zRobotSetMotorSpeed(2, 0);
-    zDie(1, "To close");
-  }
-}
-void Drive(){
- 
-  zRobotSetMotorSpeed(1, -robotData.moter_Right);
-  zRobotSetMotorSpeed(2, robotData.moter_Left);
-  Serial.println("Driving");
-  Serial.println(robotData.moter_Right);
-}
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
-  LineSensor line;
-  SonicSensor sonic;
-  Driver drive;
-  Obsticale obsticale;
-  zInitialize();
-  zScheduleTask(SensorData, line.Period, line.ExecTime);
-  zScheduleTask(SonicData, sonic.Period, sonic.ExecTime);
-  zScheduleTask(Obsticales, obsticale.Period, obsticale.ExecTime);
-  zScheduleTask(Drive, drive.Period, drive.ExecTime);
-  
-
-  zStart();
-  vTaskSuspend(*zTaskList[2].handle);   //Suspend Task until needed
-}
-
-void loop() {
-  
-}
-void Obstacle(bool RI) {
-  /*if (!RI) {
-    moter_Left = nogas - 10;
-    moter_Right = gas;
-  } else {
-    moter_Left = gas;
-    moter_Right = nogas - 10;
-  }
-  Drive(moter_Right, moter_Left);
-  delay(70);
-  moter_Right = moter_Left = gas;
-
-  Drive(moter_Right, moter_Left);
-  delay(300);*/
-}
-/*
-void Drive(int R, int L) {
-  zRobotSetMotorSpeed(1, -R);
-  zRobotSetMotorSpeed(2, L);
-}
-*/
 void DebugPrint(const RobotData& data){
   int intvalues[NUM_FIELDS] = {
     data.moter_Right,

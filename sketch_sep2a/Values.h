@@ -1,8 +1,9 @@
-int gas =80;
+int gas =130;
 int nogas = 30;
 int n = 0;
 bool ObstacleInWay = false;
 int NR_OF_TASKS = 4;
+int DistanceToInterupt = 30;
 
 struct RobotData{
   int moter_Right = 0;
@@ -16,7 +17,7 @@ struct LineSensor{
   int ExecTime = 1;
 };
 struct SonicSensor{
-  int Period = 20;
+  int Period = 7;
   int ExecTime = 4;
 };
 struct Driver{
