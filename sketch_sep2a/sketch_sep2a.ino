@@ -2,122 +2,87 @@
 #include "Values.h"
 
 RobotData robotData;
+
 void run(int Right, int Left){
   zRobotSetMotorSpeed(1, -Right);
   zRobotSetMotorSpeed(2, Left);
 }
 
-void Obsticales(){
- if(ObstacleInWay){
-  n++;
-  if(n < 4){
-   !robotData.medsols ? run(0, 200) : run(200, 0);
-  }
-  else if(n >= 4 && n < 8){
-    !robotData.medsols ? run(100, 100) : run(100, 100);
-  }
-  else if(n >= 8 && n < 14){
-    !robotData.medsols ? run(180, 0) : run(0, 180);
-  }
-  else if(zRobotGetLineSensor() != 3){
-    ObstacleInWay = false;
-  }
-  else if(n > 70){
-    run(0,0);
-  }
-  else{
-    run(100, 100);
-  }
-  }
- 
- }
+void TaskLineSensor(){
+  if(!OBSTACLE_DETECTED && !OBSTACLE_TO_CLOSE){     //If no obstacle in front of car - read sensor else continue
+    robotData.linesensor = zRobotGetLineSensor();
+    float error = 0;
+    if(lasterror == 0 && robotData.linesensor == 3){
+      lasterror = MEDSOLS > MOTSOLS ? -1 : 1;
+    }
+    switch (robotData.linesensor){
+      case 0: error = 0; break;
+      case 1: error = -1; MEDSOLS++; break;
+      case 2: error = 1;  MOTSOLS++; break;
+      case 3: error = lasterror; break;
+    }
 
-void SensorData(){
-  /*
-  *   Read sensor data and update which way robot should drive
-  */
-  if(!ObstacleInWay){
-    ReadLineSensor();
+    integral += error;
+    float derivative = error - lasterror;
+    float correction = Kp * error + Ki * integral + Kd * derivative;
+
+    int leftspeed = BASE_SPEED - correction;
+    int rightspeed = BASE_SPEED + correction;
+
+    run(leftspeed, rightspeed);
+    lasterror = error;
   }
 }
 
-void SonicData(){
-  if(!ObstacleInWay){
-    ReadSonicSensor();
+void TaskObstacleCheck(){
+  robotData.ultrasensor = zRobotGetUltraSensor();
+  if((robotData.ultrasensor > 20 && robotData.ultrasensor < INTERUPT_DISTANCE && !OBSTACLE_TO_CLOSE) || (OBSTACLE_DETECTED && !OBSTACLE_TO_CLOSE)){
+    OBSTACLE_DETECTED ? n++ : n = 0;
+    OBSTACLE_DETECTED = true;
+    if(n < 3){
+      MEDSOLS < MOTSOLS ? run(0, 200) : run(200, 0);
+    }
+    else if(n >= 3 && n < 7){
+      MEDSOLS < MOTSOLS ? run(100, 100) : run(100, 100);
+    }
+    else if(n >= 7 && n < 10){
+      MEDSOLS < MOTSOLS ? run(350, 0) : run(0, 350);
+    }
+    else if(n > 9 && n < 70){
+      MEDSOLS > MOTSOLS ? run(100, 80) : run(80, 100);
+    }
+    else if(n > 70){
+      run(0,0);
+    }
+
+    if(zRobotGetLineSensor() != 3 && n > 10){
+      OBSTACLE_DETECTED = false;
+    }
+  }
+  else if (robotData.ultrasensor < 25 && !OBSTACLE_DETECTED){
+    OBSTACLE_TO_CLOSE = true;
+    run(-100, -100);
+  }
+  else if(robotData.ultrasensor > 25 && OBSTACLE_TO_CLOSE){
+    OBSTACLE_TO_CLOSE = false;
   }
 }
-void Drive(){
- if(!ObstacleInWay){
-  zRobotSetMotorSpeed(1, -robotData.moter_Right);
-  zRobotSetMotorSpeed(2, robotData.moter_Left);
-  Serial.println("Driving");
-  Serial.println(robotData.moter_Right);
-}}
+
 void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
   LineSensor line;
   SonicSensor sonic;
-  Driver drive;
-  Obsticale obsticale;
   zInitialize();
-  zScheduleTask(SensorData, line.Period, line.ExecTime);
-  zScheduleTask(SonicData, sonic.Period, sonic.ExecTime);
-  zScheduleTask(Obsticales, obsticale.Period, obsticale.ExecTime);
-  zScheduleTask(Drive, drive.Period, drive.ExecTime);
-  
+  /*
+      Task period and time analyzation:
+        CPU Utilazation = ExecTime_1 / PeriodTime_1 + ExecTime_2 / PeriodTime_2 ...
+        If this exeeds 1 the processor cant schedule all tasks and will eventually fail
+  */
 
+  zScheduleTask(TaskObstacleCheck, sonic.Period, sonic.ExecTime);
+  zScheduleTask(TaskLineSensor, line.Period, line.ExecTime);
   zStart();
 }
 
 void loop() {
   
-}
-void ReadSonicSensor(){
-  robotData.ultrasensor = zRobotGetUltraSensor();
-  if (robotData.ultrasensor < DistanceToInterupt && robotData.ultrasensor > DistanceToInterupt - 20){
-    ObstacleInWay = true;
-    n = 0;    
-  }
-  else if(robotData.ultrasensor < DistanceToInterupt - 20){
-    run(-100, -100);
-  }
-}
-void ReadLineSensor(){
-  robotData.linesensor = zRobotGetLineSensor();
-
-  if (robotData.linesensor == 0) {
-    robotData.moter_Right = gas;
-    robotData.moter_Left = gas;
-  } else if (robotData.linesensor == 2) {
-    robotData.moter_Right = nogas;
-    robotData.moter_Left = gas;
-    robotData.medsols = false;
-  } else if (robotData.linesensor == 1) {
-    robotData.moter_Right = gas;
-    robotData.moter_Left = gas;
-    robotData.medsols = true;
-  } else if (robotData.linesensor == 3) {  // white
-    if (robotData.medsols) {
-      robotData.moter_Right = gas;
-      robotData.moter_Left = nogas;
-    } else {
-      robotData.moter_Right = nogas;
-      robotData.moter_Left = gas;
-    }
-  }
-}
-void DebugPrint(const RobotData& data){
-  int intvalues[NUM_FIELDS] = {
-    data.moter_Right,
-    data.moter_Left,
-    static_cast<int>(data.medsols),
-    data.ultrasensor,
-    data.linesensor
-  };
-  for(int i= 0; i< NUM_FIELDS; i++){
-    Serial.print(DebugLabels[i]);
-    Serial.flush();
-    Serial.println(intvalues[i]);
-  }
 }
